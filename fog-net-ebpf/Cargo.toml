@@ -7,10 +7,19 @@ edition = "2021"
 aya-ebpf = { git = "https://github.com/aya-rs/aya" }
 aya-log-ebpf = { git = "https://github.com/aya-rs/aya" }
 fog-net-common = { path = "../fog-net-common" }
+network-types = "0.0.5"
 
 [[bin]]
 name = "fog-net"
 path = "src/main.rs"
+
+[[bin]]
+name = "pin-map"
+path = "src/pinmap.rs"
+
+[[bin]]
+name = "monitor"
+path = "src/monitor.rs"
 
 [profile.dev]
 opt-level = 3

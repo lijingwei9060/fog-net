@@ -1,9 +1,13 @@
+use std::path::Path;
+
 use anyhow::Context;
+use aya::maps::HashMap;
 use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Ebpf};
 use aya_log::EbpfLogger;
 use clap::Parser;
-use log::{info, warn, debug};
+use fog_net::{get_map_mac_nic, MAC_NIC, MAP_PATH};
+use log::{debug, info, warn};
 use tokio::signal;
 
 #[derive(Debug, Parser)]
@@ -29,30 +33,41 @@ async fn main() -> Result<(), anyhow::Error> {
         debug!("remove limit on locked memory failed, ret is: {}", ret);
     }
 
-    // This will include your eBPF object file as raw bytes at compile-time and load it at
-    // runtime. This approach is recommended for most real-world use cases. If you would
-    // like to specify the eBPF program at runtime rather than at compile-time, you can
-    // reach for `Bpf::load_file` instead.
-    #[cfg(debug_assertions)]
-    let mut bpf = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/debug/fog-net"
-    ))?;
-    #[cfg(not(debug_assertions))]
-    let mut bpf = Ebpf::load(include_bytes_aligned!(
-        "../../target/bpfel-unknown-none/release/fog-net"
-    ))?;
-    if let Err(e) = EbpfLogger::init(&mut bpf) {
-        // This can happen if you remove all log statements from your eBPF program.
-        warn!("failed to initialize eBPF logger: {}", e);
-    }
-    let program: &mut Xdp = bpf.program_mut("fog_net").unwrap().try_into()?;
-    program.load()?;
-    program.attach(&opt.iface, XdpFlags::default())
-        .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
+    let path_mac_nic = Path::new(MAP_PATH).join(MAC_NIC);
 
-    info!("Waiting for Ctrl-C...");
-    signal::ctrl_c().await?;
-    info!("Exiting...");
+    if path_mac_nic.exists() {
+        let mut map_mac_nic = get_map_mac_nic()?;
+        info!("Waiting for Ctrl-C...");
+        signal::ctrl_c().await?;
+        info!("Exiting...");
+    } else {
+        // This will include your eBPF object file as raw bytes at compile-time and load it at
+        // runtime. This approach is recommended for most real-world use cases. If you would
+        // like to specify the eBPF program at runtime rather than at compile-time, you can
+        // reach for `Bpf::load_file` instead.
+        #[cfg(debug_assertions)]
+        let mut bpf = Ebpf::load(include_bytes_aligned!(
+            "../../target/bpfel-unknown-none/debug/monitor"
+        ))?;
+        #[cfg(not(debug_assertions))]
+        let mut bpf = Ebpf::load(include_bytes_aligned!(
+            "../../target/bpfel-unknown-none/release/monitor"
+        ))?;
+        if let Err(e) = EbpfLogger::init(&mut bpf) {
+            // This can happen if you remove all log statements from your eBPF program.
+            warn!("failed to initialize eBPF logger: {}", e);
+        }
+        let program: &mut Xdp = bpf.program_mut("fog_net").unwrap().try_into()?;
+        program.load()?;
+        program.attach(&opt.iface, XdpFlags::SKB_MODE)
+        .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
+        // let mut map_mac_nic: HashMap<_, u32, u32> =
+        //     HashMap::try_from(bpf.map_mut("MAC_NIC").unwrap())?;
+
+        info!("Waiting for Ctrl-C...");
+        signal::ctrl_c().await?;
+        info!("Exiting...");
+    }
 
     Ok(())
 }
