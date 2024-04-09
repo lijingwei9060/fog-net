@@ -1,9 +1,6 @@
 use std::path::Path;
-
 use anyhow::Context;
-use aya::maps::HashMap;
-use aya::programs::{Xdp, XdpFlags};
-use aya::{include_bytes_aligned, Ebpf};
+use aya::{include_bytes_aligned, maps::HashMap, programs::{Xdp, XdpFlags}, Ebpf};
 use aya_log::EbpfLogger;
 use clap::Parser;
 use fog_net::{get_map_mac_nic, MAC_NIC, MAP_PATH};
@@ -45,13 +42,14 @@ async fn main() -> Result<(), anyhow::Error> {
         // runtime. This approach is recommended for most real-world use cases. If you would
         // like to specify the eBPF program at runtime rather than at compile-time, you can
         // reach for `Bpf::load_file` instead.
+
         #[cfg(debug_assertions)]
         let mut bpf = Ebpf::load(include_bytes_aligned!(
-            "../../target/bpfel-unknown-none/debug/monitor"
+            "../../../target/bpfel-unknown-none/debug/monitor"
         ))?;
         #[cfg(not(debug_assertions))]
         let mut bpf = Ebpf::load(include_bytes_aligned!(
-            "../../target/bpfel-unknown-none/release/monitor"
+            "../../../target/bpfel-unknown-none/release/monitor"
         ))?;
         if let Err(e) = EbpfLogger::init(&mut bpf) {
             // This can happen if you remove all log statements from your eBPF program.

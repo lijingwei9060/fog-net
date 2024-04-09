@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"] }
 aya-log = { git = "https://github.com/aya-rs/aya" }
+aya-obj = { git = "https://github.com/aya-rs/aya" }
 clap = { version = "4.1", features = ["derive"] }
 fog-net-common = { path = "../fog-net-common", features = ["user"] }
 anyhow = "1"
@@ -17,4 +18,4 @@ tokio = { version = "1.25", features = ["macros", "rt", "rt-multi-thread", "net"
 
 [[bin]]
 name = "fog-net"
-path = "src/main.rs"
+path = "src/bin/main.rs"
