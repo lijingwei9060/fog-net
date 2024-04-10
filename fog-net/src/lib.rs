@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use aya::maps::{HashMap, Map, MapData, MapError};
-use fog_net_common::NetworkInterface;
+use fog_net_common::endpoint::NetworkInterface;
 
 pub const MAP_PATH: &str = "/sys/fs/bpf/";
 pub const MAC_NIC: &str = "map_mac_nic";

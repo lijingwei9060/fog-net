@@ -1,5 +1,5 @@
 #![no_std]
-
+pub mod endpoint;
 use core::{fmt::Debug, hash::Hash};
 pub const BPF_MAPS_CAPACITY: u32 = 1024;
 
@@ -58,28 +58,5 @@ pub struct ACLRule {
 #[cfg(feature = "user")]
 unsafe impl aya::Pod for ACLRule{}
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct NetworkInterface {
-    // pub mac: [u8; 6],
-    pub ifindex: u32,
-    
-    // pub eni_id: u32,
-    // pub ipv4: IpAddr,
-    // pub ipv6: IpAddr,
-    // pub ipv4_mask: u8,
-    // pub ipv6_mask: u8,
-    // pub subnet_id: u32,
-    // pub private_ip: IpAddr,    
-    // pub is_bare_metal: u8,
-    // pub bm_vlan_id: u16,
 
-    // /// source_dst_check         1<<0
-    // /// is_sys_mod               1<<1
-    // /// is_need_mod_lvs_vip      1<<2
-    // pub flags: u8,
-}
-
-#[cfg(feature = "user")]
-unsafe impl aya::Pod for NetworkInterface {}
 

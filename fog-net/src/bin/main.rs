@@ -4,6 +4,7 @@ use aya::{include_bytes_aligned, maps::HashMap, programs::{Xdp, XdpFlags}, Ebpf}
 use aya_log::EbpfLogger;
 use clap::Parser;
 use fog_net::{get_map_mac_nic, MAC_NIC, MAP_PATH};
+use fog_net_common::{endpoint::NetworkInterface, IpAddr};
 use log::{debug, info, warn};
 use tokio::signal;
 
@@ -45,11 +46,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
         #[cfg(debug_assertions)]
         let mut bpf = Ebpf::load(include_bytes_aligned!(
-            "../../../target/bpfel-unknown-none/debug/monitor"
+            "../../../target/bpfel-unknown-none/debug/arp_xdp"
         ))?;
         #[cfg(not(debug_assertions))]
         let mut bpf = Ebpf::load(include_bytes_aligned!(
-            "../../../target/bpfel-unknown-none/release/monitor"
+            "../../../target/bpfel-unknown-none/release/arp_xdp"
         ))?;
         if let Err(e) = EbpfLogger::init(&mut bpf) {
             // This can happen if you remove all log statements from your eBPF program.
@@ -59,8 +60,11 @@ async fn main() -> Result<(), anyhow::Error> {
         program.load()?;
         program.attach(&opt.iface, XdpFlags::SKB_MODE)
         .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
-        // let mut map_mac_nic: HashMap<_, u32, u32> =
-        //     HashMap::try_from(bpf.map_mut("MAC_NIC").unwrap())?;
+        let mut map_mac_nic: HashMap<_, [u8; 4], NetworkInterface> =
+            HashMap::try_from(bpf.map_mut("LOCAL_ARP_ENDPOINT").unwrap())?;
+
+        let nic = NetworkInterface{ mac: [0,0,0,0,0,0], ifindex: 8, vlan_id: 0, eni_id: 0, ipv4: IpAddr::V4([0,0,0,0]), flags: 0};
+        map_mac_nic.insert([0,0,0,0], nic, 0)?;
 
         info!("Waiting for Ctrl-C...");
         signal::ctrl_c().await?;
