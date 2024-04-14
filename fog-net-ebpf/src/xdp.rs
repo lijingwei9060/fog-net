@@ -35,7 +35,7 @@ fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
 
     
     match ethtype {
-        networktype::eth::EtherType::Loop => {
+        networktype::EtherType::Loop => {
             info!(
                 &ctx,
                 "iface:{} smac:{:mac} dmac:{:mac} type: loop",
@@ -44,7 +44,7 @@ fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
                 dst_mac
             );
         }
-        networktype::eth::EtherType::Ipv4 => {
+        networktype::EtherType::Ipv4 => {
             let ipv4hdr: *const Ipv4Hdr = ptr_at(&ctx, EthHdr::LEN).ok_or(())?;
             let source_addr = u32::from_be(unsafe { (*ipv4hdr).src_addr });
             let dst_addr = u32::from_be(unsafe { (*ipv4hdr).dst_addr });
@@ -77,7 +77,7 @@ fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
                 dport,
             );
         }
-        networktype::eth::EtherType::Arp => {
+        networktype::EtherType::Arp => {
             info!(
                 &ctx,
                 "iface:{} smac:{:mac} dmac:{:mac} type: loop",
