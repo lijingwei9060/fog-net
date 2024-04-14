@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 
-use core::mem;
+use core::mem::{self, size_of};
 
 use aya_ebpf::{
-    bindings::xdp_action::{self, XDP_REDIRECT},
-    helpers::{bpf_redirect, bpf_xdp_output},
+    bindings::xdp_action,
+    helpers::{bpf_csum_diff, bpf_redirect},
     macros::xdp,
     programs::XdpContext,
 };
@@ -13,8 +13,6 @@ use aya_log_ebpf::info;
 use network_types::{
     eth::EthHdr,
     ip::{IpProto, Ipv4Hdr},
-    tcp::TcpHdr,
-    udp::UdpHdr,
 };
 
 use fog_net_common::endpoint::LOCAL_ARP_ENDPOINT;
@@ -32,20 +30,42 @@ pub fn fog_net(ctx: XdpContext) -> u32 {
     }
 }
 
-fn arp_redirect(ctx: XdpContext) -> Result<u32, ()> {
-    let ethhdr: *const EthHdr = ptr_at(&ctx, 0)?;
+fn arp_redirect(ctx: XdpContext) -> Result<u32, u32> {
+    let ethhdr: *const EthHdr = ptr_at(&ctx, 0).ok_or(xdp_action::XDP_PASS)?;
     let src_mac = unsafe { (*ethhdr).src_addr };
     let dst_mac = unsafe { (*ethhdr).dst_addr };
 
     if network_types::eth::EtherType::Ipv4 == unsafe { (*ethhdr).ether_type } {
-        let ipv4hdr: *const Ipv4Hdr = ptr_at(&ctx, EthHdr::LEN)?;        
+        let ipv4hdr = ptr_at_mut::<Ipv4Hdr>(&ctx, EthHdr::LEN).ok_or(xdp_action::XDP_PASS)?;
         let source_addr = u32::from_be(unsafe { (*ipv4hdr).src_addr });
         let dst_addr = u32::from_be(unsafe { (*ipv4hdr).dst_addr });
 
-        info!( &ctx, "{:mac}{:i} {:mac}:{:i}", src_mac, source_addr, dst_mac, dst_addr);
+        info!(
+            &ctx,
+            "{:mac}{:i} {:mac}:{:i}", src_mac, source_addr, dst_mac, dst_addr
+        );
         if unsafe { (*ipv4hdr).proto } == IpProto::Icmp {
             match unsafe { LOCAL_ARP_ENDPOINT.get(&[0, 0, 0, 0]) } {
-                Some(nic) => return Ok(unsafe { bpf_redirect(nic.ifindex, 0) as u32 }),
+                Some(nic) => {
+                    unsafe {
+                        (*ipv4hdr).dst_addr = u32::from_le_bytes([127, 0, 0, 1]);
+                        (*ipv4hdr).src_addr = u32::from_le_bytes([127, 0, 0, 1]);
+                    }
+                    unsafe { (*ipv4hdr).check = 0 };                  
+                    let full_cksum = unsafe {
+                        bpf_csum_diff(
+                            mem::MaybeUninit::zeroed().assume_init(),
+                            0,
+                            ipv4hdr as *mut _,
+                            Ipv4Hdr::LEN as u32,
+                            0,
+                        )  as u64
+                    };
+
+                    unsafe { (*ipv4hdr).check = csum_fold_helper(full_cksum) };
+                    
+                    return Ok(unsafe { bpf_redirect(nic.ifindex, 0) as u32 });
+                }
                 _ => return Ok(xdp_action::XDP_PASS),
             }
         }
@@ -53,79 +73,32 @@ fn arp_redirect(ctx: XdpContext) -> Result<u32, ()> {
     Ok(xdp_action::XDP_PASS)
 }
 
-fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
-    let ethhdr: *const EthHdr = ptr_at(&ctx, 0)?;
-    let ingress_iface = unsafe { (*ctx.ctx).ingress_ifindex };
-    // let egress_iface = unsafe { (*ctx.ctx).egress_ifindex };
-    let src_mac = unsafe { (*ethhdr).src_addr };
-    let dst_mac = unsafe { (*ethhdr).dst_addr };
-    let ethtype = unsafe { (*ethhdr).ether_type };
-
-    match ethtype {
-        network_types::eth::EtherType::Loop => {
-            info!(
-                &ctx,
-                "iface:{} smac:{:mac} dmac:{:mac} type: loop", ingress_iface, src_mac, dst_mac
-            );
-        }
-        network_types::eth::EtherType::Ipv4 => {
-            let ipv4hdr: *const Ipv4Hdr = ptr_at(&ctx, EthHdr::LEN)?;
-            let source_addr = u32::from_be(unsafe { (*ipv4hdr).src_addr });
-            let dst_addr = u32::from_be(unsafe { (*ipv4hdr).dst_addr });
-
-            let (proto, sport, dport) = match unsafe { (*ipv4hdr).proto } {
-                IpProto::Tcp => {
-                    let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
-                    let sport = u16::from_be(unsafe { (*tcphdr).source });
-                    let dport = u16::from_be(unsafe { (*tcphdr).dest });
-                    ("tcp", sport, dport)
-                }
-                IpProto::Udp => {
-                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
-                    let sport = u16::from_be(unsafe { (*udphdr).source });
-                    let dport = u16::from_be(unsafe { (*udphdr).dest });
-                    ("udp", sport, dport)
-                }
-                _ => return Err(()),
-            };
-            info!(
-                &ctx,
-                "iface:{}  smac:{:mac} dmac:{:mac} type:ipv4 proto:{} {:i}:{} {:i}:{}",
-                ingress_iface,
-                src_mac,
-                dst_mac,
-                proto,
-                source_addr,
-                sport,
-                dst_addr,
-                dport,
-            );
-        }
-        network_types::eth::EtherType::Arp => {
-            info!(
-                &ctx,
-                "iface:{} smac:{:mac} dmac:{:mac} type: loop", ingress_iface, src_mac, dst_mac
-            );
-        }
-        // network_types::eth::EtherType::Ipv6 => todo!(),
-        // network_types::eth::EtherType::FibreChannel => todo!(),
-        // network_types::eth::EtherType::Infiniband => todo!(),
-        // network_types::eth::EtherType::LoopbackIeee8023 => todo!(),
-        _ => {}
-    }
-
-    Ok(xdp_action::XDP_PASS)
-}
-
 #[inline(always)]
-fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
+fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Option<*const T> {
     let start = ctx.data();
     let end = ctx.data_end();
     let len = mem::size_of::<T>();
 
     if start + offset + len > end {
-        return Err(());
+        return None;
     }
 
-    Ok((start + offset) as *const T)
+    Some((start + offset) as *const T)
+}
+
+#[inline(always)]
+fn ptr_at_mut<T>(ctx: &XdpContext, offset: usize) -> Option<*mut T> {
+    let ptr = ptr_at::<T>(ctx, offset)?;
+    Some(ptr as *mut T)
+}
+
+// Converts a checksum into u16
+#[inline(always)]
+pub fn csum_fold_helper(mut csum: u64) -> u16 {
+    for _i in 0..4 {
+        if (csum >> 16) > 0 {
+            csum = (csum & 0xffff) + (csum >> 16);
+        }
+    }
+    !(csum as u16)
 }

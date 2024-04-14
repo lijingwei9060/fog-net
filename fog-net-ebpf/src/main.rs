@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+mod utils;
+
 use aya_ebpf::{bindings::xdp_action, macros::xdp, programs::XdpContext};
 use aya_log_ebpf::info;
 
