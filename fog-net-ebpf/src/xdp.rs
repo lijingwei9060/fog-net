@@ -1,8 +1,8 @@
 #![no_std]
 #![no_main]
 
-use core::mem;
-
+mod utils;
+use utils::ptr_at;
 use aya_ebpf::{bindings::xdp_action, macros::xdp, programs::XdpContext};
 use aya_log_ebpf::info;
 use network_types::{
@@ -11,8 +11,6 @@ use network_types::{
     tcp::TcpHdr,
     udp::UdpHdr,
 };
-
-use fog_net_common::endpoint::{NetworkInterface, LOCAL_ENDPOINT};
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
@@ -28,7 +26,7 @@ pub fn fog_net(ctx: XdpContext) -> u32 {
 }
 
 fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
-    let ethhdr: *const EthHdr = ptr_at(&ctx, 0)?;
+    let ethhdr: *const EthHdr = ptr_at(&ctx, 0).ok_or(())?;
     let ingress_iface = unsafe { (*ctx.ctx).ingress_ifindex };
     // let egress_iface = unsafe { (*ctx.ctx).egress_ifindex };
     let src_mac = unsafe { (*ethhdr).src_addr };
@@ -47,19 +45,19 @@ fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
             );
         }
         network_types::eth::EtherType::Ipv4 => {
-            let ipv4hdr: *const Ipv4Hdr = ptr_at(&ctx, EthHdr::LEN)?;
+            let ipv4hdr: *const Ipv4Hdr = ptr_at(&ctx, EthHdr::LEN).ok_or(())?;
             let source_addr = u32::from_be(unsafe { (*ipv4hdr).src_addr });
             let dst_addr = u32::from_be(unsafe { (*ipv4hdr).dst_addr });
 
             let (proto, sport, dport) = match unsafe { (*ipv4hdr).proto } {
                 IpProto::Tcp => {
-                    let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let tcphdr: *const TcpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN).ok_or(())?;
                     let sport = u16::from_be(unsafe { (*tcphdr).source });
                     let dport = u16::from_be(unsafe { (*tcphdr).dest });
                     ("tcp", sport, dport)
                 }
                 IpProto::Udp => {
-                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN)?;
+                    let udphdr: *const UdpHdr = ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN).ok_or(())?;
                     let sport = u16::from_be(unsafe { (*udphdr).source });
                     let dport = u16::from_be(unsafe { (*udphdr).dest });
                     ("udp", sport, dport)
@@ -97,17 +95,4 @@ fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
     }
 
     Ok(xdp_action::XDP_PASS)
-}
-
-#[inline(always)]
-fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
-    let start = ctx.data();
-    let end = ctx.data_end();
-    let len = mem::size_of::<T>();
-
-    if start + offset + len > end {
-        return Err(());
-    }
-
-    Ok((start + offset) as *const T)
 }

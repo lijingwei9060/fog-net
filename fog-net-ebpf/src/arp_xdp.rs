@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use core::mem::{self, size_of};
+use core::mem;
 
 use aya_ebpf::{
     bindings::xdp_action,
@@ -16,6 +16,8 @@ use network_types::{
 };
 
 use fog_net_common::endpoint::LOCAL_ARP_ENDPOINT;
+mod utils;
+use utils::{ptr_at, ptr_at_mut, csum_fold_helper};
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
@@ -73,32 +75,4 @@ fn arp_redirect(ctx: XdpContext) -> Result<u32, u32> {
     Ok(xdp_action::XDP_PASS)
 }
 
-#[inline(always)]
-fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Option<*const T> {
-    let start = ctx.data();
-    let end = ctx.data_end();
-    let len = mem::size_of::<T>();
 
-    if start + offset + len > end {
-        return None;
-    }
-
-    Some((start + offset) as *const T)
-}
-
-#[inline(always)]
-fn ptr_at_mut<T>(ctx: &XdpContext, offset: usize) -> Option<*mut T> {
-    let ptr = ptr_at::<T>(ctx, offset)?;
-    Some(ptr as *mut T)
-}
-
-// Converts a checksum into u16
-#[inline(always)]
-pub fn csum_fold_helper(mut csum: u64) -> u16 {
-    for _i in 0..4 {
-        if (csum >> 16) > 0 {
-            csum = (csum & 0xffff) + (csum >> 16);
-        }
-    }
-    !(csum as u16)
-}

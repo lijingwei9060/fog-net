@@ -9,6 +9,11 @@ aya-log-ebpf = { git = "https://github.com/aya-rs/aya" }
 fog-net-common = { path = "../fog-net-common" }
 network-types = "0.0.5"
 
+[features]
+default = ["xdp"]
+xdp = []
+tc = []
+
 [[bin]]
 name = "fog-net"
 path = "src/main.rs"
@@ -24,6 +29,7 @@ path = "src/xdp.rs"
 [[bin]]
 name = "arp_xdp"
 path = "src/arp_xdp.rs"
+required-features = ["xdp"]
 
 [profile.dev]
 opt-level = 3
