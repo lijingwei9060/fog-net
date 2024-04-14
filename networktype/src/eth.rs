@@ -39,6 +39,8 @@ pub enum EtherType {
     VLACP = 0x8103_u16.to_be(),
     /// Internet Protocol Version 6 
     Ipv6 = 0x86DD_u16.to_be(),
+    MPLSUnicast = 0x8847_u16.to_be(),
+    MPLSMulticast = 0x8848_u16.to_be(),
     /// Ethernet Slow Protocols such as the Link Aggregation Control Protocol (LACP)
     LACP = 0x8809_u16.to_be(),
     /// Service VLAN tag identifier (S-Tag) on Q-in-Q tunnel
