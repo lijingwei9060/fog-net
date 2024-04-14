@@ -1,9 +1,9 @@
 use core::mem;
 
-use crate::EtherType;
+use crate::{EtherType, Validate};
 
 /// Ethernet header, which is present at the beginning of every Ethernet frame.
-#[repr(C, packed)]
+#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub struct EthHdr {
@@ -20,3 +20,8 @@ impl EthHdr {
 }
 
 
+impl Validate for EthHdr {
+    fn validate(&self) -> bool {
+        self.ether_type == EtherType::Ipv4 || self.ether_type == EtherType::Ipv6
+    }
+}

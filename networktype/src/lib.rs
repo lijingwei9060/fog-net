@@ -103,14 +103,14 @@ pub mod bitfield;
 pub mod eth;
 pub mod icmp;
 pub mod ip;
+pub mod qinq;
 pub mod tcp;
 pub mod udp;
-pub mod vxlan;
 pub mod vlan;
-pub mod qinq;
+pub mod vxlan;
 
 /// Protocol which is encapsulated in the payload of the Ethernet frame.
-/// 
+///
 /// According [EtherType](https://en.wikipedia.org/wiki/EtherType)
 #[repr(u16)]
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
@@ -122,14 +122,14 @@ pub enum EtherType {
     /// wake on lan
     WakeOnLan = 0x0842_u16.to_be(),
     /// Cisco Discovery Protocol
-    CDP = 0x2000_u16.to_be(), 
+    CDP = 0x2000_u16.to_be(),
     /// VLAN-tagged frame (IEEE 802.1Q) and Shortest Path Bridging IEEE 802.1aq with NNI compatibility
     VLAN = 0x8100_u16.to_be(),
     /// Simple Loop Prevention Protocol
     SLPP = 0x8102_u16.to_be(),
     /// Virtual Link Aggregation Control Protocol
     VLACP = 0x8103_u16.to_be(),
-    /// Internet Protocol Version 6 
+    /// Internet Protocol Version 6
     Ipv6 = 0x86DD_u16.to_be(),
     MPLSUnicast = 0x8847_u16.to_be(),
     MPLSMulticast = 0x8848_u16.to_be(),
@@ -137,10 +137,41 @@ pub enum EtherType {
     LACP = 0x8809_u16.to_be(),
     /// Service VLAN tag identifier (S-Tag) on Q-in-Q tunnel
     QinQ = 0x88A8_u16.to_be(),
-    /// Link Layer Discovery Protocol 
+    /// Link Layer Discovery Protocol
     LLDP = 0x88CC_u16.to_be(),
     FibreChannel = 0x8906_u16.to_be(),
     /// RDMA over Converged Ethernet (RoCE)
     RoCE = 0x8915_u16.to_be(),
     LoopbackIeee8023 = 0x9000_u16.to_be(),
+}
+
+impl TryFrom<u16> for EtherType {
+    type Error = ();
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match value {
+            0x0060 => Ok(EtherType::Loop),
+            0x0800 => Ok(EtherType::Ipv4),
+            0x0806 => Ok(EtherType::Arp),
+            0x0842 => Ok(EtherType::WakeOnLan),
+            0x2000 => Ok(EtherType::CDP),
+            0x8100 => Ok(EtherType::VLAN),
+            0x8102 => Ok(EtherType::SLPP),
+            0x8103 => Ok(EtherType::VLACP),
+            0x86DD => Ok(EtherType::Ipv6),
+            0x8847 => Ok(EtherType::MPLSUnicast),
+            0x8848 => Ok(EtherType::MPLSMulticast),
+            0x8809 => Ok(EtherType::LACP),
+            0x88A8 => Ok(EtherType::QinQ),
+            0x88CC => Ok(EtherType::LLDP),
+            0x8906 => Ok(EtherType::FibreChannel),
+            0x8915 => Ok(EtherType::RoCE),
+            0x9000 => Ok(EtherType::LoopbackIeee8023),
+            _ => Err(()),
+        }
+    }
+}
+
+pub trait Validate {
+    /// Returns true if the header is valid, false otherwise.
+    fn validate(&self) -> bool;
 }

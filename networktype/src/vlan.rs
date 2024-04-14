@@ -1,9 +1,9 @@
 use core::mem;
 
-use crate::{bitfield::BitfieldUnit, EtherType};
+use crate::{bitfield::BitfieldUnit, EtherType, Validate};
 
 /// Vlan Ethernet header, which is present at the beginning of every Ethernet frame.
-#[repr(C, packed)]
+#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub struct VlanHdr {
@@ -12,6 +12,7 @@ pub struct VlanHdr {
     /// Source MAC address.
     pub src_addr: [u8; 6],
     pub tpid: u16,
+    pub _bitfield_align_1: [u8; 0],
     pub _bitfield_1: BitfieldUnit<[u8; 2usize]>,
     /// Protocol which is encapsulated in the payload of the frame.
     pub ether_type: EtherType,
@@ -75,5 +76,12 @@ impl VlanHdr {
             let val: u8 = mem::transmute(val);
             self._bitfield_1.set(13usize, 3u8, val as u64)
         }
+    }
+}
+
+
+impl Validate for VlanHdr {
+    fn validate(&self) -> bool {
+        self.ether_type == EtherType::VLAN 
     }
 }

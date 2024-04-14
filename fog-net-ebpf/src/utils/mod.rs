@@ -5,6 +5,7 @@ use core::mem;
 use aya_ebpf::programs::XdpContext;
 #[cfg(not(feature = "xdp"))]
 use aya_ebpf::programs::TcContext;
+use networktype::{eth::EthHdr, vlan::VlanHdr, EtherType};
 
 pub mod tc;
 pub mod xdp;
@@ -49,4 +50,29 @@ pub fn ptr_at_mut<T>(
 ) -> Option<*mut T> {
     let ptr = ptr_at::<T>(ctx, offset)?;
     Some(ptr as *mut T)
+}
+
+
+#[inline(always)]
+#[allow(dead_code)]
+pub fn parse_l2_header(
+    #[cfg(feature = "xdp")] ctx: &XdpContext,
+    #[cfg(not(feature = "xdp"))] ctx: &TcContext
+) -> Option<EtherType> {
+    let ethtype:  u16 =  unsafe {  *ptr_at(ctx, EthHdr::LEN - 2)? };
+    // is valid ethertype
+    match EtherType::try_from(ethtype){
+        Ok(ethertype) => return Some(ethertype),
+        Err(_) => (),
+    }
+
+    let vlantype: u16 =  unsafe {  *ptr_at(ctx, VlanHdr::LEN - 2)? };
+    // is valid ethertype
+    match EtherType::try_from(vlantype){
+        Ok(vlantype) => return Some(vlantype),
+        Err(_) => (),
+    }
+
+
+    Some(EtherType::Arp)
 }
