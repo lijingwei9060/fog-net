@@ -10,7 +10,7 @@ use aya_ebpf::{
     programs::XdpContext,
 };
 use aya_log_ebpf::info;
-use network_types::{
+use networktype::{
     eth::EthHdr,
     ip::{IpProto, Ipv4Hdr},
 };
@@ -37,7 +37,7 @@ fn arp_redirect(ctx: XdpContext) -> Result<u32, u32> {
     let src_mac = unsafe { (*ethhdr).src_addr };
     let dst_mac = unsafe { (*ethhdr).dst_addr };
 
-    if network_types::eth::EtherType::Ipv4 == unsafe { (*ethhdr).ether_type } {
+    if networktype::eth::EtherType::Ipv4 == unsafe { (*ethhdr).ether_type } {
         let ipv4hdr = ptr_at_mut::<Ipv4Hdr>(&ctx, EthHdr::LEN).ok_or(xdp_action::XDP_PASS)?;
         let source_addr = u32::from_be(unsafe { (*ipv4hdr).src_addr });
         let dst_addr = u32::from_be(unsafe { (*ipv4hdr).dst_addr });

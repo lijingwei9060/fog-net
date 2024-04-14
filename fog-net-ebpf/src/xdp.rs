@@ -5,7 +5,7 @@ mod utils;
 use utils::ptr_at;
 use aya_ebpf::{bindings::xdp_action, macros::xdp, programs::XdpContext};
 use aya_log_ebpf::info;
-use network_types::{
+use networktype::{
     eth::EthHdr,
     ip::{IpProto, Ipv4Hdr},
     tcp::TcpHdr,
@@ -35,7 +35,7 @@ fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
 
     
     match ethtype {
-        network_types::eth::EtherType::Loop => {
+        networktype::eth::EtherType::Loop => {
             info!(
                 &ctx,
                 "iface:{} smac:{:mac} dmac:{:mac} type: loop",
@@ -44,7 +44,7 @@ fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
                 dst_mac
             );
         }
-        network_types::eth::EtherType::Ipv4 => {
+        networktype::eth::EtherType::Ipv4 => {
             let ipv4hdr: *const Ipv4Hdr = ptr_at(&ctx, EthHdr::LEN).ok_or(())?;
             let source_addr = u32::from_be(unsafe { (*ipv4hdr).src_addr });
             let dst_addr = u32::from_be(unsafe { (*ipv4hdr).dst_addr });
@@ -77,7 +77,7 @@ fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
                 dport,
             );
         }
-        network_types::eth::EtherType::Arp => {
+        networktype::eth::EtherType::Arp => {
             info!(
                 &ctx,
                 "iface:{} smac:{:mac} dmac:{:mac} type: loop",
@@ -86,11 +86,6 @@ fn try_fog_net(ctx: XdpContext) -> Result<u32, ()> {
                 dst_mac
             );
         }
-        // network_types::eth::EtherType::Ipv6 => todo!(),
-        // network_types::eth::EtherType::FibreChannel => todo!(),
-        // network_types::eth::EtherType::Infiniband => todo!(),
-        // network_types::eth::EtherType::LoopbackIeee8023 => todo!(),
-
         _=> {},
     }
 

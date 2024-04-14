@@ -1,2 +1,2 @@
 [workspace]
-members = ["xtask", "fog-net", "fog-net-common"]
+members = ["xtask", "fog-net", "fog-net-common", "networktype"]

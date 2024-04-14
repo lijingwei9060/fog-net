@@ -8,6 +8,7 @@ use aya_ebpf::programs::TcContext;
 
 pub mod tc;
 pub mod xdp;
+pub mod vlan;
 
 // Converts a checksum into u16
 #[inline(always)]

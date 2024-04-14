@@ -6,7 +6,7 @@ use core::mem;
 use aya_ebpf::{bindings::xdp_action, helpers::bpf_redirect, macros::{map, xdp}, maps::HashMap, programs::XdpContext};
 use aya_log_ebpf::info;
 use fog_net_common::{endpoint::NetworkInterface, BPF_MAPS_CAPACITY};
-use network_types::eth::EthHdr;
+use networktype::eth::EthHdr;
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {

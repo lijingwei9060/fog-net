@@ -1,7 +1,7 @@
 use core::mem;
 
 use aya_ebpf::{bindings::TC_ACT_OK, programs::TcContext};
-use network_types::tcp::TcpHdr;
+use networktype::tcp::TcpHdr;
 
 
 // Gives us raw pointers to a specific offset in the packet
