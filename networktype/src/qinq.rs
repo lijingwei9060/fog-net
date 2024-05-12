@@ -26,6 +26,6 @@ impl QinQHdr {
 
 impl Validate for QinQHdr {
     fn validate(&self) -> bool {
-        self.ether_type == EtherType::QinQ
+        self.service_tpid == EtherType::QinQ as u16 && self.tpid == EtherType::VLAN as u16
     }
 }

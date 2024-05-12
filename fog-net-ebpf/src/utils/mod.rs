@@ -56,8 +56,7 @@ pub fn ptr_at_mut<T>(
 #[inline(always)]
 #[allow(dead_code)]
 pub fn parse_l2_header(
-    #[cfg(feature = "xdp")] ctx: &XdpContext,
-    #[cfg(not(feature = "xdp"))] ctx: &TcContext
+    ctx: &XdpContext
 ) -> Option<EtherType> {
     let ethtype:  u16 =  unsafe {  *ptr_at(ctx, EthHdr::LEN - 2)? };
     // is valid ethertype

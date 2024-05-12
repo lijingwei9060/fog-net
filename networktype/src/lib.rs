@@ -123,6 +123,22 @@ pub enum EtherType {
     WakeOnLan = 0x0842_u16.to_be(),
     /// Cisco Discovery Protocol
     CDP = 0x2000_u16.to_be(),
+    /// Stream Reservation Protocol
+    SRP = 0x22EA_u16.to_be(),
+    /// Audio Video Transport Protocol
+    AVTP = 0x22F0_u16.to_be(),
+    /// IETF TRILL Protocol
+    TRILL = 0x22F3_u16.to_be(),
+    /// DEC MOP RC
+    MOP = 0x6002_u16.to_be(),
+    /// DECnet Phase IV, DNA Routing
+    DECnet = 0x6003_u16.to_be(),
+    DECLAT = 0x6004_u16.to_be(),
+    /// Reverse Address Resolution Protocol
+    RARP = 0x8035_u16.to_be(),
+    AppleTalk = 0x809B_u16.to_be(),
+    /// AppleTalk Address Resolution Protocol
+    AARP = 0x80F3_u16.to_be(),
     /// VLAN-tagged frame (IEEE 802.1Q) and Shortest Path Bridging IEEE 802.1aq with NNI compatibility
     VLAN = 0x8100_u16.to_be(),
     /// Simple Loop Prevention Protocol
@@ -154,6 +170,15 @@ impl TryFrom<u16> for EtherType {
             0x0806 => Ok(EtherType::Arp),
             0x0842 => Ok(EtherType::WakeOnLan),
             0x2000 => Ok(EtherType::CDP),
+            0x22EA => Ok(EtherType::SRP),
+            0x22F0 => Ok(EtherType::AVTP),
+            0x22F3 => Ok(EtherType::TRILL),
+            0x6002 => Ok(EtherType::MOP),
+            0x6003 => Ok(EtherType::DECnet),
+            0x6004 => Ok(EtherType::DECLAT),
+            0x8035 => Ok(EtherType::RARP),
+            0x809B => Ok(EtherType::AppleTalk),
+            0x80F3 => Ok(EtherType::AARP),
             0x8100 => Ok(EtherType::VLAN),
             0x8102 => Ok(EtherType::SLPP),
             0x8103 => Ok(EtherType::VLACP),
@@ -171,6 +196,17 @@ impl TryFrom<u16> for EtherType {
     }
 }
 
+impl Default  for EtherType{
+    fn default() -> Self {
+        EtherType::Ipv4
+    }
+}
+
+impl EtherType{
+    pub fn is_vlan(&self) -> bool{
+        self == &EtherType::VLAN || self == &EtherType::QinQ
+    }
+}
 pub trait Validate {
     /// Returns true if the header is valid, false otherwise.
     fn validate(&self) -> bool;
