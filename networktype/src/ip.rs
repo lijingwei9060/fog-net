@@ -15,16 +15,53 @@ pub enum IpHdr {
 #[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub struct Ipv4Hdr {
     pub _bitfield_align_1: [u8; 0],
+    /// - Version: the first field tells us which IP version we are using, only IPv4 uses this header so you will always find decimal value 4 here.
+    /// - Header Length: this 4 bit field tells us the length of the IP header in 32 bit increments.
+    /// The minimum length of an IP header is 20 bytes so with 32 bit increments, you would see value of 5 here.
+    /// The maximum value we can create with 4 bits is 15 so with 32 bit increments, that would be a header length of 60 bytes.
+    /// This field is also called the Internet Header Length (IHL).
     pub _bitfield_1: BitfieldUnit<[u8; 1usize]>,
+    /// Type of Service: this is used for QoS (Quality of Service).
     pub tos: u8,
+    /// Total Length: this 16-bit field indicates the entire size of the IP packet (header and data) in bytes.
+    /// The minimum size is 20 bytes (if you have no data) and the maximum size is 65,535 bytes, that’s the highest value you can create with 16 bits.
     pub tot_len: u16,
+    /// Identification: If the IP packet is fragmented then each fragmented packet will use the same 16 bit identification number to identify to which IP packet they belong to.
+    /// 如果数据包原始长度超过数据包所要经过的数据链路的最大传输单元（MTU），那么必须将数据包分段为更小的数据包。
     pub id: u16,
+    /// IP Flags: These 3 bits are used for fragmentation:
+    /// - The first bit is always set to 0.
+    /// - The second bit is called the DF (Don’t Fragment) bit and indicates that this packet should not be fragmented.
+    /// 当DF位被设置为1时，表示路由器不能对数据包进行分段处理。如果数据包由于不能被分段而未能被转发，那么路由器将丢弃该数据包并向源点发送错误消息。
+    /// 这一功能可以在网络上用于测试MTU值。可以使用Ping工具可以对DF位进行设置测试。
+    /// - The third bit is called the MF (More Fragments) bit and is set on all fragmented packets except the last one.
+    ///
+    /// Fragment Offset: this 13 bit field specifies the position of the fragment in the original fragmented IP packet.
+    /// 以8个八位组为单位，用于指明分段起始点相对于报头起始点的偏移量。
     pub frag_off: u16,
+    /// Time to Live: Everytime an IP packet passes through a router, the time to live field is decremented by 1.
+    /// Once it hits 0 the router will drop the packet and sends an ICMP time exceeded message to the sender.
+    /// The time to live field has 8 bits and is used to prevent packets from looping around forever (if you have a routing loop).
+    /// Default to 64.
     pub ttl: u8,
+    /// Protocol: this 8 bit field tells us which protocol is enapsulated in the IP packet, for example TCP has value 6 and UDP has value 17.
     pub proto: IpProto,
+    /// Header Checksum: this 16 bit field is used to store a checksum of the header. The receiver can use the checksum to check if there are any errors in the header.
+    /// 针对IP报头的纠错字段， 校验和不计算被封装的数据。
     pub check: u16,
+    /// Source Address: here you will find the 32 bit source IP address.
     pub src_addr: u32,
+    /// Destination Address: and here’s the 32 bit destination IP address.
     pub dst_addr: u32,
+    // IP Option: this field is not used often, is optional and has a variable length based on the options that were used.
+    // When you use this field, the value in the header length field will increase.
+    // An example of a possible option is “source route” where the sender requests for a certain routing path.
+    // 松散源路由选择（Loose Source Routing）——它给出了一连串路由器接口的IP地址序列。数据包必须沿着IP地址序列传送，但是允许在相继的两个地址之间跳过多台路由器。
+    // 严格源路由选择（Strict Source Routing）——它也给出了一系列路由器接口的IP地址序列。不同于松散源路由选择，数据包必要严格按照路由转发。如果下一跳不再列表中，那么将会发生错误。
+    // 记录路由（Record Route）——当数据包离开时为每台路由器提供空间记录数据包的出站接口地址，以便保存数据包经过的所有路由器的记录。记录路由选项提供了类似于路由追踪的功能，但是不同点在于这里记录了双向路径上的出站接口信息。
+    // 时间戳（Timestamp）——除了每台路由器还会记录一个时间戳之外，时间戳选项十分类似于记录路由选项，这样数据包不仅可以知道自己到过哪里，而且还可以记录到达的时间。
+    // 还可以在Option 字段内使用Linux 内核模块 TOA，tcp option address ，用来传递记录源ip地址，多用在网关转发时（LB等SDN网关上）；
+    // 填充（Padding）——该字段通过在可选项字段后面添加0来补足32位，这样保证报头长度是32位的倍数。
 }
 
 impl Ipv4Hdr {
@@ -43,6 +80,9 @@ impl Ipv4Hdr {
         }
     }
 
+    /// Version: the first field tells us which IP version we are using, only IPv4 uses this header so you will always find decimal value 4 here.
+    /// - 0100表示IP版本4（IPv4）
+    /// - 0110表示IP版本6（IPv6）
     #[inline]
     pub fn version(&self) -> u8 {
         unsafe { mem::transmute(self._bitfield_1.get(4usize, 4u8) as u8) }
@@ -115,13 +155,41 @@ pub union in6_u {
 #[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub struct Ipv6Hdr {
     pub _bitfield_align_1: [u8; 0],
+    /// Version (4-bits): Indicates version of Internet Protocol which contains bit sequence 0110.
+    /// Traffic Class (8-bits): The Traffic Class field indicates class or priority of IPv6 packet which is similar to Service Field in IPv4 packet.
+    /// It helps routers to handle the traffic based on the priority of the packet. If congestion occurs on the router then packets with the least priority will be discarded.
+    /// As of now, only 4-bits are being used (and the remaining bits are under research), in which 0 to 7 are assigned to Congestion controlled traffic and 8 to 15 are assigned to Uncontrolled traffic.
     pub _bitfield_1: BitfieldUnit<[u8; 1usize]>,
+    /// Flow Label (20-bits): Flow Label field is used by a source to label the packets belonging to the same flow
+    /// in order to request special handling by intermediate IPv6 routers, such as non-default quality of service or
+    /// real-time service. In order to distinguish the flow, an intermediate router can use the source address,
+    /// a destination address, and flow label of the packets. Between a source and destination, multiple flows
+    /// may exist because many processes might be running at the same time. Routers or Host that does not support the
+    /// functionality of flow label field and for default router handling, flow label field is set to 0. While setting up
+    /// the flow label, the source is also supposed to specify the lifetime of the flow.
     pub flow_label: [u8; 3usize],
+    /// Payload Length (16-bits): It is a 16-bit (unsigned integer) field, indicates the total size of the payload which
+    /// tells routers about the amount of information a particular packet contains in its payload. The payload Length field
+    /// includes extension headers(if any) and an upper-layer packet. In case the length of the payload is greater
+    /// than 65,535 bytes (payload up to 65,535 bytes can be indicated with 16-bits), then the payload length field
+    /// will be set to 0 and the jumbo payload option is used in the Hop-by-Hop options extension header.
     pub payload_len: u16,
+    /// Next Header (8-bits): Next Header indicates the type of extension header(if present) immediately following the IPv6
+    /// header. Whereas In some cases it indicates the protocols contained within upper-layer packets, such as TCP, UDP.
     pub next_hdr: IpProto,
+    /// Hop Limit (8-bits): Hop Limit field is the same as TTL in IPv4 packets. It indicates the maximum number of intermediate
+    /// nodes IPv6 packet is allowed to travel. Its value gets decremented by one, by each node that forwards the packet and the
+    /// packet is discarded if the value decrements to 0. This is used to discard the packets that are stuck in an infinite loop
+    /// because of some routing error.
     pub hop_limit: u8,
+    /// Source Address (128-bits): Source Address is the 128-bit IPv6 address of the original source of the packet.
     pub src_addr: in6_addr,
+    /// Destination Address (128-bits): The destination Address field indicates the IPv6 address of the final destination(in most cases).
+    /// All the intermediate nodes can use this information in order to correctly route the packet.
     pub dst_addr: in6_addr,
+    // Extension Headers: In order to rectify the limitations of the IPv4 Option Field, Extension Headers are introduced in IP version 6.
+    // The extension header mechanism is a very important part of the IPv6 architecture. The next Header field of IPv6 fixed header points
+    // to the first Extension Header and this first extension header points to the second extension header and so on.
 }
 
 impl Ipv6Hdr {
