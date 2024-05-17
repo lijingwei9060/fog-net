@@ -7,7 +7,7 @@ use aya_ebpf::{
     programs::TcContext,
 };
 use aya_log_ebpf::info;
-use fog_net_common::trace::TraceCtx;
+use fog_net_common::{constant::DROP_INVALID, ctx::skb::parse_ipv4_header, trace::TraceCtx};
 use networktype::{eth::EthHdr, EtherType};
 
 /// Attachment/entry point is ingress for veth.
@@ -72,12 +72,20 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 const MAC_ADDR: [u32; 6] = [0u32,0,0,0,0,0]; // host mac address
-pub fn handle_ipv4_from_lxc(ctx: &TcContext, dst: u32){
+pub fn handle_ipv4_from_lxc(ctx: &TcContext, dst: u32) -> Result<(), i32>{
 
     let mut trace = TraceCtx::default();
-    let mut hair_flow = false; //endpoint wants to access itself via service IP
+    
     let mut has_l4_header = false; // 对于一些特殊的数据包可能没有4层头，只有IP层
     let mut from_l7lb = false;
     let mut cluster_id = 0u64; // vpc_id
+
+    let ipv4 = parse_ipv4_header(ctx).ok_or(DROP_INVALID)?;
+    let hair_flow = ipv4.has_l4_header(); //endpoint wants to access itself via service IP
+
+    // 查询remote endpoint
+
+
+    Ok(())
 
 }
