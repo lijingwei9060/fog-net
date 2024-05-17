@@ -15,9 +15,8 @@ use networktype::{
     ip::{IpProto, Ipv4Hdr},
 };
 
-use fog_net_common::endpoint::LOCAL_ARP_ENDPOINT;
-mod utils;
-use utils::{ptr_at, ptr_at_mut, csum_fold_helper};
+use fog_net_common::{ctx::xdp::{ptr_at, ptr_at_mut, tracing_packet}, endpoint::LOCAL_ARP_ENDPOINT, utils::csum_fold_helper};
+
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
@@ -33,6 +32,7 @@ pub fn fog_net(ctx: XdpContext) -> u32 {
 }
 
 fn arp_redirect(ctx: XdpContext) -> Result<u32, u32> {
+    unsafe { tracing_packet(&ctx); }
     let ethhdr: *const EthHdr = ptr_at(&ctx, 0).ok_or(xdp_action::XDP_PASS)?;
     let src_mac = unsafe { (*ethhdr).src_addr };
     let dst_mac = unsafe { (*ethhdr).dst_addr };
@@ -53,6 +53,8 @@ fn arp_redirect(ctx: XdpContext) -> Result<u32, u32> {
                         (*ipv4hdr).dst_addr = u32::from_le_bytes([127, 0, 0, 1]);
                         (*ipv4hdr).src_addr = u32::from_le_bytes([127, 0, 0, 1]);
                     }
+
+                   
                     unsafe { (*ipv4hdr).check = 0 };                  
                     let full_cksum = unsafe {
                         bpf_csum_diff(
@@ -65,10 +67,15 @@ fn arp_redirect(ctx: XdpContext) -> Result<u32, u32> {
                     };
 
                     unsafe { (*ipv4hdr).check = csum_fold_helper(full_cksum) };
+
+                    // xdp_stats_record_action(&ctx, xdp_action::XDP_REDIRECT);
                     
                     return Ok(unsafe { bpf_redirect(nic.ifindex, 0) as u32 });
                 }
-                _ => return Ok(xdp_action::XDP_PASS),
+                _ => {
+                    // xdp_stats_record_action(&ctx, xdp_action::XDP_PASS);
+                    return Ok(xdp_action::XDP_PASS);
+                }
             }
         }
     }

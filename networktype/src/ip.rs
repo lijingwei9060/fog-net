@@ -109,7 +109,39 @@ impl Ipv4Hdr {
         });
         bitfield_unit
     }
+
+    #[inline]
+    pub fn hdrlen(&self) -> usize{
+        self.ihl() as usize * 4
+    }
+
+    #[inline]
+    pub fn is_fragment(&self) -> bool{
+        /* The frag_off portion of the header consists of:
+        *
+        * +----+----+----+----------------------------------+
+        * | RS | DF | MF | ...13 bits of fragment offset... |
+        * +----+----+----+----------------------------------+
+        *
+        * If "More fragments" or the offset is nonzero, then this is an IP
+        * fragment (RFC791).
+        */
+        self.frag_off & 0x3FFF > 0
+    }
+
+    #[inline]
+    pub fn is_not_first_fragment(&self) -> bool{
+        /* Ignore "More fragments" bit to catch all fragments but the first */
+        self.frag_off & 0x1FFF >0 
+    }
+
+    #[inline]
+    pub fn has_l4_header(&self) -> bool{
+        /* Simply a reverse of ipv4_is_not_first_fragment to avoid double negative. */
+        ! self.is_not_first_fragment()
+    }
 }
+
 
 #[cfg(feature = "std")]
 impl Ipv4Hdr {

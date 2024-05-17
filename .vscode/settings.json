@@ -1,7 +1,9 @@
 {
   "rust-analyzer.linkedProjects": [
-    "Cargo.toml",
-    "fog-net-ebpf/Cargo.toml",
-    "./fog-net-common/Cargo.toml"
-  ]
+    "Cargo.toml",    
+    "./fog-net-common/Cargo.toml",
+    "./fog-net-ebpf/Cargo.toml"
+  ],
+  "rust-analyzer.cargo.buildScripts.overrideCommand": null,
+  "rust-analyzer.cargo.allTargets": false, 
 }

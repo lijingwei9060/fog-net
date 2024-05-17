@@ -10,6 +10,7 @@ user = ["aya"]
 [dependencies]
 aya = { git = "https://github.com/aya-rs/aya", optional = true}
 aya-ebpf = { git = "https://github.com/aya-rs/aya" }
+networktype = {path = "../networktype"}
 
 [lib]
 path = "src/lib.rs"

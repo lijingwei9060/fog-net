@@ -1,21 +1,34 @@
-use core::mem;
+use networktype::{eth::EthHdr, ip::IpHdr};
 
-use aya_ebpf::{bindings::TC_ACT_OK, programs::TcContext};
-use networktype::tcp::TcpHdr;
+pub mod skb;
+pub mod xdp;
 
-
-// Gives us raw pointers to a specific offset in the packet
-#[inline(always)]
-pub unsafe fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Result<*mut T, i64> {
-    let start = ctx.data();
-    let end = ctx.data_end();
-    let len = mem::size_of::<T>();
-
-    if start + offset + len > end {
-        return Err(TC_ACT_OK.into());
-    }
-    Ok((start + offset) as *mut T)
+/// Swaps destination and source MAC addresses inside an Ethernet header
+pub fn swap_src_dst_mac(hdr: &mut EthHdr) -> Result<(), ()> {
+    let swp = (hdr.dst_addr, hdr.src_addr);
+    hdr.dst_addr = swp.1;
+    hdr.src_addr = swp.0;
+    Ok(())
 }
+
+/// Swaps destination and source IP addresses inside an IP header
+pub fn swap_src_dst_ip(hdr: &mut IpHdr) -> Result<(), ()> {
+    match hdr {
+        IpHdr::V4(hdr) => {
+            let swp = (hdr.dst_addr, hdr.src_addr);
+            hdr.dst_addr = swp.1;
+            hdr.src_addr = swp.0;
+        }
+        IpHdr::V6(hdr) => {
+            let swp = (hdr.dst_addr, hdr.src_addr);
+            hdr.dst_addr = swp.1;
+            hdr.src_addr = swp.0;
+        }
+    }
+
+    Ok(())
+}
+
 
 // Updates the TCP connection's state based on the current phase and the incoming packet's header.
 // It returns true if the state transitioned to a different phase.

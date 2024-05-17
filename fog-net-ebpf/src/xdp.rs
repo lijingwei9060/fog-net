@@ -1,10 +1,9 @@
 #![no_std]
 #![no_main]
 
-mod utils;
-use utils::ptr_at;
 use aya_ebpf::{bindings::xdp_action, macros::xdp, programs::XdpContext};
 use aya_log_ebpf::info;
+use fog_net_common::ctx::xdp::ptr_at;
 use networktype::{
     eth::EthHdr,
     ip::{IpProto, Ipv4Hdr},
