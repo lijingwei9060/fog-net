@@ -15,7 +15,7 @@ use networktype::{
     ip::{IpProto, Ipv4Hdr},
 };
 
-use fog_net_common::{ctx::xdp::{ptr_at, ptr_at_mut, tracing_packet}, endpoint::LOCAL_ARP_ENDPOINT, utils::csum_fold_helper};
+use fog_net_common::{ctx::xdp::{ptr_at, ptr_at_mut, tracing_packet}, map::endpoint::map::LOCAL_ARP_ENDPOINT, utils::csum_fold_helper};
 
 
 #[panic_handler]

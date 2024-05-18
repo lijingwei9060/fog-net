@@ -5,7 +5,7 @@ use crate::{bitfield::BitfieldUnit, EtherType, Validate};
 /// QinQHdr Ethernet header, which is present at the beginning of every Ethernet frame.
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub struct QinQHdr {
     /// Destination MAC address.
     pub dst_addr: [u8; 6],

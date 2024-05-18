@@ -5,7 +5,7 @@ use core::mem;
 
 use aya_ebpf::{bindings::xdp_action, helpers::bpf_redirect, macros::{map, xdp}, maps::HashMap, programs::XdpContext};
 use aya_log_ebpf::info;
-use fog_net_common::{endpoint::NetworkInterface, BPF_MAPS_CAPACITY};
+use fog_net_common::map::endpoint::NIC;
 use networktype::eth::EthHdr;
 
 #[panic_handler]
@@ -15,7 +15,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 
 
 #[map]
-static MAC_NIC: HashMap<[u8;6], NetworkInterface> = HashMap::<[u8;6], NetworkInterface>::with_max_entries(BPF_MAPS_CAPACITY, 0);
+static MAC_NIC: HashMap<[u8;6], NIC> = HashMap::<[u8;6], NIC>::with_max_entries(10000, 0);
 
 #[xdp]
 pub fn fog_net(ctx: XdpContext) -> u32 {

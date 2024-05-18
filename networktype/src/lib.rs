@@ -114,7 +114,7 @@ pub mod vxlan;
 /// According [EtherType](https://en.wikipedia.org/wiki/EtherType)
 #[repr(u16)]
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-#[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub enum EtherType {
     Loop = 0x0060_u16.to_be(),
     Ipv4 = 0x0800_u16.to_be(),

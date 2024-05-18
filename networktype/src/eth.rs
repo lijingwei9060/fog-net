@@ -5,7 +5,7 @@ use crate::{EtherType, Validate};
 /// Ethernet header, which is present at the beginning of every Ethernet frame.
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Default)]
-#[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub struct EthHdr {
     /// Destination MAC address.
     pub dst_addr: [u8; 6],

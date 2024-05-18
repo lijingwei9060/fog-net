@@ -52,3 +52,9 @@ pub fn ctx_load_meta(ctx: &TcContext, offset: u32) -> u32{
   // 第n个元素
   unsafe { (*ctx.skb.skb).cb[offset]}
 }
+
+/// unused
+#[inline(always)]
+pub fn bpf_clear_meta(_ctx: &TcContext){
+
+}

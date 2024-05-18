@@ -3,7 +3,7 @@ use core::mem;
 use crate::bitfield::BitfieldUnit;
 
 /// IP headers, which are present after the Ethernet header.
-#[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub enum IpHdr {
     V4(Ipv4Hdr),
     V6(Ipv6Hdr),
@@ -12,7 +12,7 @@ pub enum IpHdr {
 //// IPv4 header, which is present after the Ethernet header.
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub struct Ipv4Hdr {
     pub _bitfield_align_1: [u8; 0],
     /// - Version: the first field tells us which IP version we are using, only IPv4 uses this header so you will always find decimal value 4 here.

@@ -5,7 +5,7 @@ use crate::{bitfield::BitfieldUnit, EtherType, Validate};
 /// Vlan Ethernet header, which is present at the beginning of every Ethernet frame.
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Default)]
-#[cfg_attr(features = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(::serde::Serialize, ::serde::Deserialize))]
 pub struct VlanHdr {
     pub _bitfield_align_1: [u8; 0],
     /// tag control information

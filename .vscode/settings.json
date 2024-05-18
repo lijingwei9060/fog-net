@@ -5,5 +5,4 @@
     "./fog-net-ebpf/Cargo.toml"
   ],
   "rust-analyzer.cargo.buildScripts.overrideCommand": null,
-  "rust-analyzer.cargo.allTargets": false, 
 }

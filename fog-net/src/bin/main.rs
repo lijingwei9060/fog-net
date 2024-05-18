@@ -1,11 +1,16 @@
-use std::path::Path;
 use anyhow::Context;
-use aya::{include_bytes_aligned, maps::HashMap, programs::{Xdp, XdpFlags}, Ebpf};
+use aya::{
+    include_bytes_aligned,
+    maps::HashMap,
+    programs::{Xdp, XdpFlags},
+    Ebpf,
+};
 use aya_log::EbpfLogger;
 use clap::Parser;
 use fog_net::{get_map_mac_nic, MAC_NIC, MAP_PATH};
-use fog_net_common::{endpoint::NetworkInterface, IpAddr};
+use fog_net_common::map::endpoint::NIC;
 use log::{debug, info, warn};
+use std::{net::{Ipv4Addr, Ipv6Addr}, path::Path};
 use tokio::signal;
 
 #[derive(Debug, Parser)]
@@ -60,11 +65,27 @@ async fn main() -> Result<(), anyhow::Error> {
         program.load()?;
         program.attach(&opt.iface, XdpFlags::SKB_MODE)
         .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
-        let mut map_mac_nic: HashMap<_, [u8; 4], NetworkInterface> =
+        let mut map_mac_nic: HashMap<_, [u8; 4], NIC> =
             HashMap::try_from(bpf.map_mut("LOCAL_ARP_ENDPOINT").unwrap())?;
 
-        let nic = NetworkInterface{ mac: [0,0,0,0,0,0], ifindex: 8, vlan_id: 0, eni_id: 0, ipv4: IpAddr::V4([0,0,0,0]), flags: 0};
-        map_mac_nic.insert([0,0,0,0], nic, 0)?;
+        let nic = NIC {
+            mac: [0, 0, 0, 0, 0, 0],
+            ifindex: 8,
+            vlan_id: 0,
+            eni_id: 0,
+            ipv4: Ipv4Addr::new(0, 0, 0, 0),
+            flags: 0,
+            node_mac: [0, 0, 0, 0, 0, 0],
+            vm_id: 10086,
+            ipv6: Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
+            ipv4_mask: 20,
+            ipv6_mask: 0,
+            subnet_id: 10000,
+            vpc_id: 10086,
+            is_bare_metal: 0,
+            bm_vlan_id: 0,
+        };
+        map_mac_nic.insert([0, 0, 0, 0], nic, 0)?;
 
         info!("Waiting for Ctrl-C...");
         signal::ctrl_c().await?;
