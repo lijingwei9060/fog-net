@@ -1,8 +1,11 @@
 use core::mem;
 
 use aya_ebpf::programs::TcContext;
-use networktype::{eth::EthHdr, ip::{Ipv4Hdr, Ipv6Hdr}, EtherType};
-
+use networktype::{
+    eth::EthHdr,
+    ip::{Ipv4Hdr, Ipv6Hdr},
+    EtherType,
+};
 
 #[inline(always)]
 pub fn ptr_at<T>(ctx: &TcContext, offset: usize) -> Option<*const T> {
@@ -47,14 +50,14 @@ pub fn parse_ipv6_header(ctx: &TcContext) -> Option<&Ipv6Hdr> {
 }
 
 /// get metadata
-pub fn ctx_load_meta(ctx: &TcContext, offset: u32) -> u32{
-  let offset = offset as usize % unsafe { (*ctx.skb.skb).cb}.len();
-  // 第n个元素
-  unsafe { (*ctx.skb.skb).cb[offset]}
+pub fn ctx_load_meta(ctx: &TcContext, offset: u32) -> u32 {
+    let offset = offset as usize % unsafe { (*ctx.skb.skb).cb }.len();
+    // 第n个元素
+    unsafe { (*ctx.skb.skb).cb[offset] }
 }
 
 /// unused
 #[inline(always)]
-pub fn bpf_clear_meta(_ctx: &TcContext){
+pub fn bpf_clear_meta(_ctx: &TcContext) {}
 
-}
+
