@@ -1,9 +1,5 @@
 use core::net::{Ipv4Addr, Ipv6Addr};
 
-use aya_ebpf::{
-    macros::{map, xdp},
-    maps::HashMap,
-};
 
 use super::MacAddr;
 
