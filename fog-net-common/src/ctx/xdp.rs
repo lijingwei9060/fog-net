@@ -46,15 +46,15 @@ pub fn ctx_redirect_peer(_ctx: &XdpContext, _ifindex: u32, _flags: u32) -> u32 {
 }
 
 /// ctx长度
-pub fn ctx_get_full_len(ctx: &XdpContext) -> u64 {
-    unsafe { bpf_xdp_get_buff_len(ctx.as_ptr() as *mut _) }
+pub fn ctx_full_len(ctx: &XdpContext) -> u64 {
+    unsafe { bpf_xdp_get_buff_len(ctx.as_ptr() as *mut _)}
 }
 
 #[map]
 pub static mut CILIUM_XDP_SCRATCH: PerCpuArray<u32> = PerCpuArray::<u32>::with_max_entries(1, 0);
 
 /// store metadata
-pub fn ctx_store_meta(_ctx: &XdpContext, _offset: u64, datum: u32) {
+pub fn ctx_store_meta(_ctx: &XdpContext, _offset: usize, datum: u32) {
     unsafe {
         let d = CILIUM_XDP_SCRATCH.get_ptr_mut(0).unwrap();
         *d = datum;
@@ -62,7 +62,7 @@ pub fn ctx_store_meta(_ctx: &XdpContext, _offset: u64, datum: u32) {
 }
 
 /// get metadata
-pub fn ctx_load_meta(_ctx: &XdpContext, _offset: u64) -> u32 {
+pub fn ctx_load_meta(_ctx: &XdpContext, _offset: usize) -> u32 {
     unsafe {
         let d = CILIUM_XDP_SCRATCH.get_ptr_mut(0).unwrap();
         *d
@@ -70,7 +70,7 @@ pub fn ctx_load_meta(_ctx: &XdpContext, _offset: u64) -> u32 {
 }
 
 /// load and clean metadata
-pub fn ctx_load_and_clear_meta(ctx: &XdpContext, offset: u64) -> u32 {
+pub fn ctx_load_and_clear_meta(ctx: &XdpContext, offset: usize) -> u32 {
     let re = ctx_load_meta(ctx, offset);
     ctx_store_meta(ctx, offset, 0);
     re
@@ -209,4 +209,11 @@ pub unsafe fn tracing_packet(ctx: &XdpContext) -> aya_ebpf::bindings::xdp_action
     (*meta.unwrap()).set_traing(true);
 
     return xdp_action::XDP_PASS;
+}
+
+
+/// clear meta
+#[inline(always)]
+pub fn bpf_clear_meta(_ctx: &mut XdpContext){
+
 }

@@ -50,14 +50,35 @@ pub fn parse_ipv6_header(ctx: &TcContext) -> Option<&Ipv6Hdr> {
 }
 
 /// get metadata
-pub fn ctx_load_meta(ctx: &TcContext, offset: u32) -> u32 {
-    let offset = offset as usize % unsafe { (*ctx.skb.skb).cb }.len();
+#[inline(always)]
+pub fn ctx_load_meta(ctx: &TcContext, offset: usize) -> u32 {
+    let offset = offset % unsafe { (*ctx.skb.skb).cb }.len();
     // 第n个元素
     unsafe { (*ctx.skb.skb).cb[offset] }
 }
 
+/// get metadata
+#[inline(always)]
+pub fn ctx_store_meta(ctx: &TcContext, offset: usize, datum: u32) {
+    let offset = offset % unsafe { (*ctx.skb.skb).cb }.len();
+    // 第n个元素
+    unsafe {
+        (*ctx.skb.skb).cb[offset] = datum;
+    }
+}
+
+pub fn ctx_full_len(ctx: &TcContext) -> u64 {
+    ctx.len() as u64
+}
+
 /// unused
 #[inline(always)]
-pub fn bpf_clear_meta(_ctx: &TcContext) {}
+pub fn bpf_clear_meta(ctx: &mut TcContext) {
+    for i in ctx.cb_mut() {
+        *i = 0;
+    }
 
-
+    unsafe {
+        (*ctx.skb.skb).tc_classid = 0;
+    }
+}

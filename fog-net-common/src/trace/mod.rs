@@ -1,6 +1,14 @@
-use core::net::IpAddr;
+use core::{
+    hash,
+    net::{IpAddr, Ipv4Addr},
+};
 
 use aya_ebpf::EbpfContext;
+
+use crate::{
+    constant::{common::NOTIFY_CAPTURE_VER, i::EVENT_SOURCE},
+    ctx::Context,
+};
 
 use self::metrics::map::update_trace_metrics;
 
@@ -59,80 +67,6 @@ pub fn is_trace_reason(v: u8, reason: TraceReason) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(non_camel_case_types)]
 pub enum Reason {
-    DROP_UNUSED1 = -130, /* unused */
-    DROP_UNUSED2 = -131, /* unused */
-    DROP_INVALID_SIP = -132,
-    DROP_POLICY = -133,
-    DROP_INVALID = -134,
-    DROP_CT_INVALID_HDR = -135,
-    DROP_FRAG_NEEDED = -136,
-    DROP_CT_UNKNOWN_PROTO = -137,
-    DROP_UNUSED4 = -138, /* unused */
-    DROP_UNKNOWN_L3 = -139,
-    DROP_MISSED_TAIL_CALL = -140,
-    DROP_WRITE_ERROR = -141,
-    DROP_UNKNOWN_L4 = -142,
-    DROP_UNKNOWN_ICMP_CODE = -143,
-    DROP_UNKNOWN_ICMP_TYPE = -144,
-    DROP_UNKNOWN_ICMP6_CODE = -145,
-    DROP_UNKNOWN_ICMP6_TYPE = -146,
-    DROP_NO_TUNNEL_KEY = -147,
-    DROP_UNUSED5 = -148, /* unused */
-    DROP_UNUSED6 = -149, /* unused */
-    DROP_UNKNOWN_TARGET = -150,
-    DROP_UNROUTABLE = -151,
-    DROP_UNUSED7 = -152, /* unused */
-    DROP_CSUM_L3 = -153,
-    DROP_CSUM_L4 = -154,
-    DROP_CT_CREATE_FAILED = -155,
-    DROP_INVALID_EXTHDR = -156,
-    DROP_FRAG_NOSUPPORT = -157,
-    DROP_NO_SERVICE = -158,
-    DROP_UNSUPP_SERVICE_PROTO = -159,
-    DROP_NO_TUNNEL_ENDPOINT = -160,
-    DROP_NAT_46X64_DISABLED = -161,
-    DROP_EDT_HORIZON = -162,
-    DROP_UNKNOWN_CT = -163,
-    DROP_HOST_UNREACHABLE = -164,
-    DROP_NO_CONFIG = -165,
-    DROP_UNSUPPORTED_L2 = -166,
-    DROP_NAT_NO_MAPPING = -167,
-    DROP_NAT_UNSUPP_PROTO = -168,
-    DROP_NO_FIB = -169,
-    DROP_ENCAP_PROHIBITED = -170,
-    DROP_INVALID_IDENTITY = -171,
-    DROP_UNKNOWN_SENDER = -172,
-    DROP_NAT_NOT_NEEDED = -173, /* Mapped as drop code, though drop not necessary. */
-    DROP_IS_CLUSTER_IP = -174,
-    DROP_FRAG_NOT_FOUND = -175,
-    DROP_FORBIDDEN_ICMP6 = -176,
-    DROP_NOT_IN_SRC_RANGE = -177,
-    DROP_PROXY_LOOKUP_FAILED = -178,
-    DROP_PROXY_SET_FAILED = -179,
-    DROP_PROXY_UNKNOWN_PROTO = -180,
-    DROP_POLICY_DENY = -181,
-    DROP_VLAN_FILTERED = -182,
-    DROP_INVALID_VNI = -183,
-    DROP_INVALID_TC_BUFFER = -184,
-    DROP_NO_SID = -185,
-    DROP_MISSING_SRV6_STATE = -186, /* unused */
-    DROP_NAT46 = -187,
-    DROP_NAT64 = -188,
-    DROP_POLICY_AUTH_REQUIRED = -189,
-    DROP_CT_NO_MAP_FOUND = -190,
-    DROP_SNAT_NO_MAP_FOUND = -191,
-    DROP_INVALID_CLUSTER_ID = -192,
-    DROP_DSR_ENCAP_UNSUPP_PROTO = -193,
-    DROP_NO_EGRESS_GATEWAY = -194,
-    DROP_UNENCRYPTED_TRAFFIC = -195,
-    DROP_TTL_EXCEEDED = -196,
-    DROP_NO_NODE_ID = -197,
-    DROP_RATE_LIMITED = -198,
-    DROP_IGMP_HANDLED = -199,
-    DROP_IGMP_SUBSCRIBED = -200,
-    DROP_MULTICAST_HANDLED = -201,
-    DROP_HOST_NOT_READY = -202,
-    DROP_EP_NOT_READY = -203,
     REASON_FORWARDED = 0,
     REASON_PLAINTEXT = 3,
     REASON_DECRYPT = 4,
@@ -180,6 +114,20 @@ impl Default for TraceCtx {
             monitor: 0,
         }
     }
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[allow(non_camel_case_types)]
+pub enum CiliumNotifyType {
+    CILIUM_NOTIFY_UNSPEC = 0,
+    CILIUM_NOTIFY_DROP,
+    CILIUM_NOTIFY_DBG_MSG,
+    CILIUM_NOTIFY_DBG_CAPTURE,
+    CILIUM_NOTIFY_TRACE,
+    CILIUM_NOTIFY_POLICY_VERDICT,
+    CILIUM_NOTIFY_CAPTURE,
+    CILIUM_NOTIFY_TRACE_SOCK,
 }
 
 #[repr(C, align(8))]
@@ -245,40 +193,52 @@ pub fn emit_trace_notify(obs_point: TracePoint, monitor: u32) -> bool {
 }
 
 pub const TRACE_PAYLOAD_LEN: u64 = 128;
-
-pub fn send_trace_notify<C: EbpfContext>(
-    ctx: &C,
+pub const TRACE_EP_ID_UNKNOWN: u16 = 0;
+pub const TRACE_IFINDEX_UNKNOWN: u16 = 0;/* Linux kernel doesn't use ifindex 0 */
+pub fn send_trace_notify(
+    ctx: &Context,
     obs_point: TracePoint,
     src: u32,
     dst: u32,
+    orig_ip: IpAddr,
     dst_id: u16,
     ifindex: u32,
     reason: TraceReason,
     monitor: u32,
 ) {
-	let ctx_len =  15u64; //ctx len
-	let cap_len = u64::min( if monitor > 0 {
-		monitor as u64
-	} else{
-		TRACE_PAYLOAD_LEN
-	}, ctx_len);
+    let ctx_len = ctx.ctx_full_len(); //ctx len
+    let cap_len = u64::min(
+        if monitor > 0 {
+            monitor as u64
+        } else {
+            TRACE_PAYLOAD_LEN
+        },
+        ctx_len,
+    );
 
-	update_trace_metrics(ctx_len, obs_point, reason as u8);
+    update_trace_metrics(ctx_len, obs_point, reason as u8);
 
-	// 如果不需要trace就结束了
-	if !emit_trace_notify(obs_point, monitor){
-		return ;
-	}
+    // 如果不需要trace就结束了
+    if !emit_trace_notify(obs_point, monitor) {
+        return;
+    }
 
-	let msg = TraceNotify{
-		r#type: CILIUM_NOTIFY_TRACE,
-		subtype: obs_point,
-		source: Event_source,
-		hash: get_hash_recalc,
-		src_label: src,
-		dst_label: dst,
-		dst_id,
-		reason: reason as u8,
-		ifindex,
-	};
+    let msg = TraceNotify {
+        r#type: CiliumNotifyType::CILIUM_NOTIFY_TRACE as u8,
+        subtype: obs_point as u8,
+        source: EVENT_SOURCE, // HOST_EP_ID / LXC_ID
+        hash: ctx.get_hash_recalc(),
+        src_label: src,
+        dst_label: dst,
+        dst_id,
+        reason: reason as u8,
+        ifindex,
+        len_orig: ctx_len as u32,
+        len_cap: cap_len as u16,
+        version: NOTIFY_CAPTURE_VER,
+        ipv6: if orig_ip.is_ipv6() { 1 } else { 0 },
+        orig_ip,
+    };
+
+    ctx.ctx_trace_event_output(cap_len as u32, &msg);
 }

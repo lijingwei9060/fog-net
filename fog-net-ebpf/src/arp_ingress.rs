@@ -1,18 +1,26 @@
 #![no_std]
 #![no_main]
 
-use core::net::{Ipv4Addr, Ipv6Addr};
+use core::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use aya_ebpf::{
-    bindings::{TC_ACT_PIPE, TC_ACT_SHOT},
+    bindings::{TC_ACT_OK, TC_ACT_PIPE, TC_ACT_SHOT},
     macros::classifier,
     programs::TcContext,
 };
-use aya_log_ebpf::info;
 use fog_net_common::{
-    constant::{DROP_INVALID, DROP_UNSUPPORTED_L2}, ctx::skb::{bpf_clear_meta, parse_ipv4_header, parse_l2_header}, map::endpoint::NIC, queue::reset_queue_mapping, trace::TraceCtx
+    constant::common::{DROP_FRAG_NOSUPPORT, DROP_INVALID, DROP_UNKNOWN_L3, DROP_UNSUPPORTED_L2, TRACE_PAYLOAD_LEN},
+    ctx::Context,
+    map::endpoint::NIC,
+    trace::{
+        send_trace_notify, TracePoint, TraceReason, TRACE_EP_ID_UNKNOWN, TRACE_IFINDEX_UNKNOWN,
+    },
 };
-use networktype::{eth::EthHdr, EtherType};
+use networktype::EtherType;
+
+const ENABLE_IPV4_FRAGMENTS: bool = true;
+const ENABLE_MULTICAST: bool = true;
+const ENABLE_NODEPORT: bool = true;
 
 // this is me, the tc classifier working for
 // regenerate this nic when nic modified
@@ -40,8 +48,6 @@ const WHOAMI: NIC = NIC {
 pub fn cil_from_container(ctx: TcContext) -> i32 {
     // protocol verify
     // let sec_label: u32 = SECLABEL;
-    // bpf_clear_meta(ctx);
-    // reset_queue_mapping(ctx);
 
     // 1. tracing
     // 2. eth validate => DROP_UNSUPPORTED_L2
@@ -58,24 +64,60 @@ pub fn cil_from_container(ctx: TcContext) -> i32 {
     // 目标是多播地址 => ?
     // 查找目标IP、分配双向连接跟踪表空间、连接状态、hairpin、dsr
     //
-    match try_tc_ingress(ctx) {
+
+    match try_from_container(Context::Skb(ctx)) {
         Ok(ret) => ret,
-        Err(_) => TC_ACT_SHOT,
+        Err(_r) => {
+            // return send_drop_notify_ext(ctx, sec_label, UNKNOWN_ID,
+            //     TRACE_EP_ID_UNKNOWN, ret, ext_err,
+            //     CTX_ACT_DROP, METRIC_EGRESS);
+            TC_ACT_SHOT
+        }
     }
 }
 
-#[classifier]
-pub fn tc_egress(ctx: TcContext) -> i32 {
-    match try_tc_ingress(ctx) {
-        Ok(ret) => ret,
-        Err(_) => TC_ACT_SHOT,
-    }
-}
+fn try_from_container(mut ctx: Context) -> Result<i32, i32> {
+    let sec_label = WHOAMI.eni_id;
+    let vm_id = WHOAMI.vm_id;
+    let ethtype = ctx.parse_l2_header().ok_or(DROP_UNSUPPORTED_L2)?;
+    ctx.bpf_clear_meta();
+    ctx.reset_queue_mapping();
 
-fn try_tc_ingress(ctx: TcContext) -> Result<i32, i32> {
-    let ethtype = parse_l2_header(&ctx).ok_or(DROP_UNSUPPORTED_L2)?;
-    bpf_clear_meta(&ctx);
-    reset_queue_mapping(&ctx);
+    send_trace_notify(
+        &ctx,
+        TracePoint::TRACE_FROM_LXC,
+        sec_label,
+        0,
+        IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+        TRACE_EP_ID_UNKNOWN,
+        TRACE_IFINDEX_UNKNOWN as u32,
+        TraceReason::TRACE_REASON_UNKNOWN,
+        TRACE_PAYLOAD_LEN as u32,
+    );
+
+    match ethtype {
+        EtherType::Ipv4 => {
+            ctx.edt_set_aggregate(vm_id);
+        }
+        EtherType::Arp => {
+            //  ifdef ENABLE_ARP_PASSTHROUGH
+            // 	case bpf_htons(ETH_P_ARP):
+            // 		ret = CTX_ACT_OK;
+            // 		break;
+            // #elif defined(ENABLE_ARP_RESPONDER)
+            // 	case bpf_htons(ETH_P_ARP):
+            // 		ret = tail_call_internal(ctx, CILIUM_CALL_ARP, &ext_err);
+            // 		break;
+            return Ok(TC_ACT_OK);
+        }
+
+        EtherType::Ipv6 => {
+            ctx.edt_set_aggregate(vm_id);
+        }
+        _ => {
+            return Err(DROP_UNKNOWN_L3);
+        }
+    }
 
     Ok(TC_ACT_PIPE)
 }
@@ -85,18 +127,20 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     unsafe { core::hint::unreachable_unchecked() }
 }
 
-const MAC_ADDR: [u32; 6] = [0u32, 0, 0, 0, 0, 0]; // host mac address
-pub fn handle_ipv4_from_lxc(ctx: &TcContext, dst: u32) -> Result<(), i32> {
-    let mut trace = TraceCtx::default();
+pub fn handle_ipv4(mut ctx: Context) -> Result<i32, i32> {
+    let ip = ctx.parse_ipv4_header().ok_or(DROP_INVALID)?;
+    if ip.is_fragment() && !ENABLE_IPV4_FRAGMENTS {
+        /* If IPv4 fragmentation is disabled
+         * AND a IPv4 fragmented packet is received,
+         * then drop the packet.
+         */
 
-    let mut has_l4_header = false; // 对于一些特殊的数据包可能没有4层头，只有IP层
-    let mut from_l7lb = false;
-    let mut cluster_id = 0u64; // vpc_id
+        return Err(DROP_FRAG_NOSUPPORT);
+    }
 
-    let ipv4 = parse_ipv4_header(ctx).ok_or(DROP_INVALID)?;
-    let hair_flow = ipv4.has_l4_header(); //endpoint wants to access itself via service IP
-
-    // 查询remote endpoint
-
-    Ok(())
+    let daddr = Ipv4Addr::from(ip.dst_addr);
+    if daddr.is_broadcast() && ENABLE_MULTICAST{
+        // 查询多播表,如果有这个多播地址,进行多播处理的尾调CILIUM_CALL_MULTICAST_EP_DELIVERY
+    }
+    Ok(TC_ACT_OK)
 }
