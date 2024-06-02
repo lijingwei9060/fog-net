@@ -142,5 +142,15 @@ pub fn handle_ipv4(mut ctx: Context) -> Result<i32, i32> {
     if daddr.is_broadcast() && ENABLE_MULTICAST{
         // 查询多播表,如果有这个多播地址,进行多播处理的尾调CILIUM_CALL_MULTICAST_EP_DELIVERY
     }
+
+    if ENABLE_NODEPORT { 
+        // ret = nodeport_lb4(ctx, ip4, ETH_HLEN, *identity, ext_err, &is_dsr);
+		/* nodeport_lb4() returns with TC_ACT_REDIRECT for
+		 * traffic to L7 LB. Policy enforcement needs to take
+		 * place after L7 LB has processed the packet, so we
+		 * return to stack immediately here with
+		 * TC_ACT_REDIRECT.
+		 */
+    }
     Ok(TC_ACT_OK)
 }
